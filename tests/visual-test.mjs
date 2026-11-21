@@ -21,8 +21,10 @@ try{
   // F2 already activates the developer camera above; capture it from a
   // larger viewport so the full layout and surrounding runoffs are visible.
   await page.setViewportSize({width:2200,height:1800});
+  await page.keyboard.press('F5');
   await page.waitForTimeout(1200);
   await page.screenshot({path:'test-results/full-circuit-overhead.png'});
+  await page.keyboard.press('F5');
   await page.setViewportSize({width:1600,height:900});
   await writeFile('test-results/errors.txt',errors.join('\n')||'No browser errors detected');
   const canvases=await page.locator('canvas').count();
