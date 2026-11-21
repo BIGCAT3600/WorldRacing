@@ -10,6 +10,16 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x91c6e9);scene.fog=new THREE.Fog(0x91c6e9,150,370);
 const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,600);
+const mapCamera=new THREE.OrthographicCamera(-200,200,200,-200,.1,1000);
+let fullMapView=false;
+function fitMapCamera(){
+ const xs=pts.map(p=>p.x),zs=pts.map(p=>p.z);
+ const minX=Math.min(...xs)-48,maxX=Math.max(...xs)+48,minZ=Math.min(...zs)-48,maxZ=Math.max(...zs)+48;
+ const cx=(minX+maxX)/2,cz=(minZ+maxZ)/2,aspect=innerWidth/innerHeight;
+ const halfH=Math.max((maxZ-minZ)/2,(maxX-minX)/(2*aspect));
+ mapCamera.left=-halfH*aspect;mapCamera.right=halfH*aspect;mapCamera.top=halfH;mapCamera.bottom=-halfH;
+ mapCamera.position.set(cx,450,cz);mapCamera.up.set(0,0,-1);mapCamera.lookAt(cx,0,cz);mapCamera.updateProjectionMatrix();
+}
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xffffff,0x64834f,2));const sun=new THREE.DirectionalLight(0xffffff,2.3);sun.position.set(-55,95,65);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-180,right:180,top:180,bottom:-180});scene.add(sun);
 const material=c=>new THREE.MeshStandardMaterial({color:c,roughness:.85});const asphalt=material(0x383d42),grass=material(0x68a05a),white=material(0xe8e7df),red=material(0xc94435),dark=material(0x181b20),glass=material(0x263f50),metal=material(0x7b8289);
@@ -95,7 +105,7 @@ function startGame(){if(player)scene.remove(player);vehicle=$('vehicle').value;m
 function fmt(ms){if(!Number.isFinite(ms))return '—';let t=Math.max(0,ms)/1000;return String(Math.floor(t/60)).padStart(2,'0')+':'+(t%60).toFixed(2).padStart(5,'0')}
 function updateRecords(){$('best').textContent='Best lap '+fmt(bestLap);$('best10').textContent='Best 10 laps '+fmt(best10)}
 $('start').onclick=startGame;function openMenu(){$('menu').style.display='flex';started=false;sound()}function closeMenu(){$('menu').style.display='none';started=true;last=performance.now();audioStart();sound()}$('menuBtn').onclick=openMenu;$('closeMenu').onclick=closeMenu;$('soundBtn').onclick=()=>{soundOn=!soundOn;$('soundBtn').textContent=soundOn?'SOUND ON':'SOUND OFF';audioStart()};
-addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();keys[e.code]=true;if(e.code==='F2'){e.preventDefault();devCamera=!devCamera;$('devPanel').style.display=devCamera?'block':'none'}if(e.code==='F3'){e.preventDefault();devWire=!devWire;road.material.wireframe=devWire}if(e.code==='F4'&&started){e.preventDefault();let q=at(.35);pos.copy(q.p);yaw=Math.atan2(-q.t.x,-q.t.z);heading=yaw;forward=0;lateral=0;lastU=.35;progress=0;gate=0}if(e.code==='KeyR'&&started)spawn();if(e.code==='KeyM'){if(started)openMenu();else closeMenu()}});addEventListener('keyup',e=>keys[e.code]=false);addEventListener('pointerdown',()=>{if(audio&&audio.state==='suspended')audio.resume()});addEventListener('blur',()=>{for(let k in keys)keys[k]=false});
+addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();keys[e.code]=true;if(e.code==='F2'){e.preventDefault();devCamera=!devCamera;$('devPanel').style.display=devCamera?'block':'none'}if(e.code==='F5'){e.preventDefault();fullMapView=!fullMapView;if(fullMapView)fitMapCamera();$('devPanel').style.display=fullMapView||devCamera?'block':'none'}if(e.code==='F3'){e.preventDefault();devWire=!devWire;road.material.wireframe=devWire}if(e.code==='F4'&&started){e.preventDefault();let q=at(.35);pos.copy(q.p);yaw=Math.atan2(-q.t.x,-q.t.z);heading=yaw;forward=0;lateral=0;lastU=.35;progress=0;gate=0}if(e.code==='KeyR'&&started)spawn();if(e.code==='KeyM'){if(started)openMenu();else closeMenu()}});addEventListener('keyup',e=>keys[e.code]=false);addEventListener('pointerdown',()=>{if(audio&&audio.state==='suspended')audio.resume()});addEventListener('blur',()=>{for(let k in keys)keys[k]=false});
 // Soft alpha smoke sprites, pooled briefly behind the rear wheels.
 const smokeCanvas=document.createElement('canvas');smokeCanvas.width=smokeCanvas.height=64;const smokeCtx=smokeCanvas.getContext('2d'),gradient=smokeCtx.createRadialGradient(32,32,0,32,32,32);gradient.addColorStop(0,'rgba(225,230,230,.65)');gradient.addColorStop(1,'rgba(220,225,225,0)');smokeCtx.fillStyle=gradient;smokeCtx.fillRect(0,0,64,64);
 const smokeTex=new THREE.CanvasTexture(smokeCanvas),smoke=[],smokeBase=new THREE.SpriteMaterial({map:smokeTex,transparent:true,depthWrite:false});let smokeTimer=0;
@@ -134,8 +144,8 @@ if(du>0&&du<.04){progress+=du;let nextGate=[.25,.5,.75][gate];if(nextGate!==unde
 let behind=new THREE.Vector3(Math.sin(yaw)*11,6.8,Math.cos(yaw)*11),desired=pos.clone().add(behind);if(devCamera){camera.position.lerp(new THREE.Vector3(pos.x,pos.y+115,pos.z+4),1-Math.exp(-5*dt));camera.lookAt(pos.x,pos.y,pos.z);$('devPanel').textContent='DEV · TOP DOWN\nF2 camera · F3 wireframe · F4 teleport\nXYZ '+pos.x.toFixed(1)+', '+pos.y.toFixed(1)+', '+pos.z.toFixed(1)+'\nTrack offset '+near.offset.toFixed(1)+' m\nSpeed '+Math.round(Math.abs(forward)*3.6)+' km/h'}else{camera.position.lerp(desired,1-Math.exp(-5*dt));camera.lookAt(pos.x,pos.y+1.2,pos.z);}
 $('surface').textContent=onRoad?'ON TRACK':'GRASS · LOW GRIP';$('drift').textContent=hand?'HANDBRAKE':Math.abs(lateral)>3?'DRIFTING':'';$('lap').textContent=mode==='free'?'FREE DRIVE':'Lap '+lap+' / 10';$('timer').textContent=fmt(now-lapStart);
 let place=1+bots.filter(b=>(b.laps+b.u)>(lap+near.u)).length;$('position').textContent=mode==='race'?'Position '+place+' / 4':'TIME TRIAL';
-if(now>noticeUntil)$('notice').textContent='';sound();renderer.render(scene,camera)}requestAnimationFrame(frame);
+if(now>noticeUntil)$('notice').textContent='';sound();if(fullMapView){$('devPanel').textContent='FULL CIRCUIT · F5 to exit\nF2 follow camera · F3 wireframe';renderer.render(scene,mapCamera)}else renderer.render(scene,camera)}requestAnimationFrame(frame);
 // Display build identity and ensure stale HTML is not mistaken for the current release.
 console.info('World Racing V4.0 · build 9871443');
-startGame();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+startGame();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);if(fullMapView)fitMapCamera()});
 </script></body></html>
