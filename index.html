@@ -87,10 +87,25 @@ function runoff(startU,endU,side,inner=12,outer=21){
 runoff(.16,.22,1);runoff(.40,.46,-1);runoff(.72,.78,1);
 // Start/finish stripe, generated from the same circuit surface.
 for(let j=0;j<10;j++){let lateral=-W/2+(j+.5)*W/10;ribbon(0,.0012,lateral,W/10,j%2?paintWhite:paintRed,3)}
-// Pit lane uses the same spline coordinates and joins the circuit at both ends.
-{const v=[],idx=[],samples=140;for(let i=0;i<=samples;i++){let t=i/samples,u=.005+t*.11,offset=pitOffset(u);for(let side of [-4.3,4.3]){let q=at(u,offset+side).p;v.push(q.x,q.y+.28,q.z)}}for(let i=0;i<samples;i++){let j=i*2;idx.push(j,j+1,j+2,j+1,j+3,j+2)}let g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setIndex(idx);g.computeVertexNormals();let m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x50545a,side:THREE.DoubleSide}));m.receiveShadow=true;scene.add(m)}
-// Grandstand: choose a footprint with measured road and pit-lane clearance.
-{let stand=new THREE.Group();let candidates=[[-157,-65],[-160,-83],[-153,-48],[-175,-65],[-170,-95]];let location=candidates.find(([x,z])=>safePoint(x,z,14));if(location){let [x,z]=location;stand.position.set(x,0,z);cube(24,1,10,metal,0,1,0,stand);for(let r=0;r<5;r++)cube(24,.4,1.5,r%2?metal:dark,0,1.8+r*.65,-4+r*2,stand);for(let sx of [-11,11])for(let sz of [-4,4])cube(.5,4,.5,metal,sx,2,sz,stand);cube(25,.4,12,red,0,6.2,0,stand);recordObject('grandstand',stand,x,0,z,14)}}
+// Dedicated pit lane: a smooth tapered connector alongside the start straight.
+// Unlike the old parallel ribbon, its end caps merge back into the main road.
+const pitStart=.008,pitEnd=.105,pitWidth=6.4;
+function pitBlend(t){let x=Math.min(1,Math.max(0,t));return x*x*(3-2*x)}
+function pitLaneOffset(t){return -19*pitBlend(t/.22)*(1-pitBlend((t-.78)/.22))}
+const pitSurface=new THREE.MeshStandardMaterial({color:0x55595e,roughness:1,side:THREE.DoubleSide});
+{let verts=[],idx=[],samples=160;for(let i=0;i<=samples;i++){let t=i/samples,u=pitStart+(pitEnd-pitStart)*t,offset=pitLaneOffset(t),width=pitWidth*pitBlend(t/.12)*(1-pitBlend((t-.88)/.12));for(let edge of [-1,1]){let q=at(u,offset+edge*width/2).p;verts.push(q.x,q.y+.34,q.z)}}for(let i=0;i<samples;i++){let k=i*2;idx.push(k,k+1,k+2,k+1,k+3,k+2)}let g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setIndex(idx);g.computeVertexNormals();let m=new THREE.Mesh(g,pitSurface);m.receiveShadow=true;scene.add(m)}
+// Painted pit boxes and separation line; only where the pit lane has full width.
+const pitPaint=new THREE.MeshBasicMaterial({color:0xe3e5e4,side:THREE.DoubleSide});
+for(let i=0;i<7;i++){let t=.29+i*.065,u=pitStart+(pitEnd-pitStart)*t,p=at(u,pitLaneOffset(t)-1.8).p,tangent=at(u).t,mark=cube(.13,.018,3.4,pitPaint,p.x,p.y+.38,p.z);mark.rotation.y=Math.atan2(tangent.x,tangent.z)}
+// Pit wall follows the curved inner edge with a clear gap at entry and exit.
+{let points=[];for(let i=0;i<=85;i++){let t=.23+i/85*.54,u=pitStart+(pitEnd-pitStart)*t,p=at(u,pitLaneOffset(t)+pitWidth/2+1.2).p;if(safePoint(p.x,p.z,0,false))points.push(p)}for(let i=1;i<points.length;i++){let a=points[i-1],b=points[i],len=a.distanceTo(b),m=cube(.7,1.0,len,metal,(a.x+b.x)/2,Math.max(groundHeight(a.x,a.z),groundHeight(b.x,b.z))+.65,(a.z+b.z)/2);m.rotation.y=Math.atan2(b.x-a.x,b.z-a.z)}}
+// Grandstand with spectators, placed on the outer side of the main straight.
+{let stand=new THREE.Group(),candidates=[[-157,-65],[-160,-83],[-153,-48],[-175,-65],[-170,-95]],location=candidates.find(([x,z])=>safePoint(x,z,14));
+if(location){let [x,z]=location,base=groundHeight(x,z);stand.position.set(x,base,z);cube(24,1,10,metal,0,1,0,stand);for(let r=0;r<5;r++)cube(24,.4,1.5,r%2?metal:dark,0,1.8+r*.65,-4+r*2,stand);for(let sx of [-11,11])for(let sz of [-4,4])cube(.5,4,.5,metal,sx,2,sz,stand);cube(25,.4,12,red,0,6.2,0,stand);
+const shirts=[0x2267aa,0xe6c04c,0xd84338,0xf0f0eb,0x2b8c69,0x444b62];for(let r=0;r<5;r++)for(let c=0;c<18;c++){if((r*11+c*7)%9===0)continue;let px=-10.8+c*1.22,pz=-4+r*2,py=2.35+r*.65;let person=new THREE.Group();person.position.set(px,py,pz);let shirt=material(shirts[(c+r*3)%shirts.length]);cube(.48,.62,.32,shirt,0,.3,0,person);let head=new THREE.Mesh(new THREE.SphereGeometry(.23,8,6),material(0xc79774));head.position.y=.85;person.add(head);stand.add(person)}
+recordObject('grandstand',stand,x,base,z,14)}}
+// Tyre stacks at selected high-risk corners, checked against the road and pit.
+for(const [u,side] of [[.18,1],[.22,1],[.41,-1],[.46,-1],[.73,1],[.78,1]]){let p=at(u,side*23).p;if(!safePoint(p.x,p.z,1))continue;let h=groundHeight(p.x,p.z);for(let level=0;level<3;level++){let tyre=new THREE.Mesh(new THREE.TorusGeometry(.65,.23,8,16),tyreMat);tyre.rotation.x=Math.PI/2;tyre.position.set(p.x,h+.32+level*.4,p.z);scene.add(tyre)}}
 // Trackside validation report for the developer overlay.
 const tracksideReport={barrierOffset,roadClearance,objects:tracksideObjects.length};
 const trunk=material(0x745038),leaf=material(0x397a42);for(let i=0;i<95;i++){let a=i*2.399,rad=210+(i%3)*8,x=Math.cos(a)*rad,z=Math.sin(a)*rad;cube(1,5,1,trunk,x,2.5,z);let c=new THREE.Mesh(new THREE.ConeGeometry(4,10,20),leaf);c.position.set(x,10,z);scene.add(c)}
