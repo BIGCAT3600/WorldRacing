@@ -15,16 +15,16 @@ try{
   await page.screenshot({path:'test-results/driving.png'});
   await page.keyboard.down('w');await page.waitForTimeout(2000);await page.keyboard.up('w');
   await page.screenshot({path:'test-results/accelerating.png'});
-  await page.keyboard.press('F2');await page.waitForTimeout(600);
+  await page.keyboard.press('2');await page.waitForTimeout(600);
   await page.screenshot({path:'test-results/developer-view.png'});
   // Capture the whole circuit in a fixed, straight-down view for visual review.
   // F2 already activates the developer camera above; capture it from a
   // larger viewport so the full layout and surrounding runoffs are visible.
   await page.setViewportSize({width:2200,height:1800});
-  await page.keyboard.press('F5');
+  await page.keyboard.press('5');
   await page.waitForTimeout(1200);
   await page.screenshot({path:'test-results/full-circuit-overhead.png'});
-  await page.keyboard.press('F5');
+  await page.keyboard.press('5');
   await page.setViewportSize({width:1600,height:900});
   await writeFile('test-results/errors.txt',errors.join('\n')||'No browser errors detected');
   const canvases=await page.locator('canvas').count();
