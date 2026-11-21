@@ -5,11 +5,18 @@ let points=JSON.parse(localStorage.getItem('wr-track-studio')||'null')?.points||
 function el(tag,attrs,parent){let e=document.createElementNS(ns,tag);for(let [k,v] of Object.entries(attrs))e.setAttribute(k,v);parent.appendChild(e);return e}
 function sample(){let out=[],smooth=+$('smooth').value;for(let i=0;i<points.length;i++){let a=points[(i-1+points.length)%points.length],b=points[i],c=points[(i+1)%points.length],d=points[(i+2)%points.length];for(let j=0;j<smooth;j++){let t=j/smooth,t2=t*t,t3=t2*t;out.push([0,1].map(k=>.5*((2*b[k])+(-a[k]+c[k])*t+(2*a[k]-5*b[k]+4*c[k]-d[k])*t2+(-a[k]+3*b[k]-3*c[k]+d[k])*t3)))}}return out}
 function path(pts){return 'M'+pts.map(p=>p[0].toFixed(2)+','+p[1].toFixed(2)).join(' L')+' Z'}
-function redraw(){geo.replaceChildren();handles.replaceChildren();let p=sample(),w=+$('width').value;$('widthText').textContent=w+' m';$('smoothText').textContent=$('smooth').value;const center=path(p);let road=el('path',{d:center,fill:'none',stroke:'#373d42','stroke-width':w,'stroke-linejoin':'round','stroke-linecap':'round'},geo);road.addEventListener('dblclick',addNode);
-if($('barriers').checked)el('path',{d:center,fill:'none',stroke:'#a7adb1','stroke-width':w+26,'stroke-linejoin':'round'},geo);
-if($('barriers').checked)el('path',{d:center,fill:'none',stroke:'#60835d','stroke-width':w+23,'stroke-linejoin':'round'},geo);
+function redraw(){geo.replaceChildren();handles.replaceChildren();let p=sample(),w=+$('width').value;$('widthText').textContent=w+' m';$('smoothText').textContent=$('smooth').value;const center=path(p);
+if($('barriers').checked){el('path',{d:center,fill:'none',stroke:'#a7adb1','stroke-width':w+26,'stroke-linejoin':'round'},geo);el('path',{d:center,fill:'none',stroke:'#60835d','stroke-width':w+23,'stroke-linejoin':'round'},geo)}
 el('path',{d:center,fill:'none',stroke:'#373d42','stroke-width':w,'stroke-linejoin':'round'},geo);
-if($('kerbs').checked){for(let i=0;i<p.length;i+=2){let a=p[i],b=p[(i+1)%p.length],prev=p[(i-1+p.length)%p.length],next=p[(i+2)%p.length],dx=next[0]-prev[0],dy=next[1]-prev[1],l=Math.hypot(dx,dy)||1,nx=-dy/l,ny=dx/l;for(let side of [-1,1])el('line',{x1:a[0]+nx*side*(w/2-.4),y1:a[1]+ny*side*(w/2-.4),x2:b[0]+nx*side*(w/2-.4),y2:b[1]+ny*side*(w/2-.4),stroke:(i/2)%2?'#eeeae1':'#c54d3d','stroke-width':1.8},geo)}}
+if($('kerbs').checked){
+const defs=el('defs',{},geo),mask=el('mask',{id:'kerb-road-band',maskUnits:'userSpaceOnUse',x:-250,y:-210,width:500,height:420},defs);
+el('rect',{x:-250,y:-210,width:500,height:420,fill:'black'},mask);
+el('path',{d:center,fill:'none',stroke:'white','stroke-width':w,'stroke-linejoin':'round'},mask);
+el('path',{d:center,fill:'none',stroke:'black','stroke-width':Math.max(0,w-3.2),'stroke-linejoin':'round'},mask);
+const kg=el('g',{mask:'url(#kerb-road-band)'},geo);
+el('path',{d:center,fill:'none',stroke:'#eeeae1','stroke-width':w,'stroke-linejoin':'round'},kg);
+el('path',{d:center,fill:'none',stroke:'#c54d3d','stroke-width':w,'stroke-dasharray':'7 7','stroke-linejoin':'round'},kg)}
+const hit=el('path',{d:center,fill:'none',stroke:'transparent','stroke-width':w,'pointer-events':'stroke'},geo);hit.addEventListener('dblclick',addNode);
 points.forEach((pt,i)=>{let h=el('circle',{cx:pt[0],cy:pt[1],r:4.5,fill:'#e8f5ff',stroke:'#2277d7','stroke-width':2,'data-index':i,style:'cursor:grab'},handles);h.addEventListener('pointerdown',e=>{e.preventDefault();push();drag=i;svg.setPointerCapture(e.pointerId)});h.addEventListener('contextmenu',e=>{e.preventDefault();if(points.length>5){push();points.splice(i,1);redraw()}})});
 let length=0,minRadius=Infinity;for(let i=0;i<p.length;i++){let a=p[(i-1+p.length)%p.length],b=p[i],c=p[(i+1)%p.length],ab=Math.hypot(a[0]-b[0],a[1]-b[1]),bc=Math.hypot(b[0]-c[0],b[1]-c[1]),ca=Math.hypot(c[0]-a[0],c[1]-a[1]);length+=bc;let cross=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]));if(cross>.00001)minRadius=Math.min(minRadius,ab*bc*ca/(2*cross))}
 $('nodes').textContent=points.length;$('length').textContent=Math.round(length)+' m';$('radius').textContent=isFinite(minRadius)?Math.round(minRadius)+' m':'—';$('status').textContent=minRadius<18?'Tight bends detected: increase radius by moving nodes apart.':'';
