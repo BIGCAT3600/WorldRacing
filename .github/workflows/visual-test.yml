@@ -1,0 +1,26 @@
+name: World Racing visual smoke test
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  browser-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - name: Capture game screenshots and browser errors
+        run: node tests/visual-test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: world-racing-screenshots
+          path: test-results/
+          retention-days: 14
